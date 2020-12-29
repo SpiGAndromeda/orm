@@ -72,13 +72,16 @@ class ReflectionEmbeddedProperty extends ReflectionProperty
      */
     public function getValue($object = null)
     {
-        $embeddedObject = $this->parentProperty->getValue($object);
+        $embeddedObject = ! $this->parentProperty->getDeclaringClass()->isInstance($object) ||
+            $this->parentProperty->isInitialized($object) ?
+            $this->parentProperty->getValue($object) :
+            null;
 
         if (null === $embeddedObject) {
             return null;
         }
 
-        return $this->childProperty->getValue($embeddedObject);
+        return $this->childProperty->isInitialized($embeddedObject) ? $this->childProperty->getValue($embeddedObject) : null;
     }
 
     /**
@@ -86,7 +89,21 @@ class ReflectionEmbeddedProperty extends ReflectionProperty
      */
     public function setValue($object, $value = null)
     {
-        $embeddedObject = $this->parentProperty->getValue($object);
+        if ($value === null &&
+            $this->parentProperty->hasType() &&
+            $this->childProperty->hasType() &&
+            $this->parentProperty->getType()->allowsNull() &&
+            ! $this->childProperty->getType()->allowsNull()
+        ) {
+            $this->parentProperty->setValue($object, null);
+
+            return;
+        }
+
+        $embeddedObject = ! $this->parentProperty->getDeclaringClass()->isInstance($object) ||
+            $this->parentProperty->isInitialized($object) ?
+            $this->parentProperty->getValue($object) :
+            null;
 
         if (null === $embeddedObject) {
             $this->instantiator = $this->instantiator ?: new Instantiator();
